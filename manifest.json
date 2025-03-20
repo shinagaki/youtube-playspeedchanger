@@ -1,0 +1,21 @@
+{
+  "name": "YouTube Playback Speed",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "description": "YouTube の動画読み込み時に再生速度を変更します",
+  "permissions": [
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [{
+    "matches": ["*://*.youtube.com/*"],
+    "js": [
+      "content.js"
+    ]
+  }]
+} 
