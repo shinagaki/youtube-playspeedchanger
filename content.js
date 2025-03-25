@@ -1,39 +1,60 @@
-function setPlaybackRate(videoElement, rate) {
-	function handler(event) {
-		if (event.target instanceof HTMLVideoElement) {
-			event.target.playbackRate = rate;
+function setPlaybackRate(rate) {
+	const videoElement = document.querySelector("video");
+	if (videoElement) {
+		function handler(event) {
+			if (event.target instanceof HTMLVideoElement) {
+				event.target.playbackRate = rate;
+			}
 		}
+
+		// すぐに適用（動画がすでに読み込まれている場合にも対応）
+		handler({ target: videoElement });
+
+		// メタデータが読み込まれたときにも適用
+		videoElement.onloadedmetadata = handler;
 	}
-
-	// すぐに適用（動画がすでに読み込まれている場合にも対応）
-	handler({ target: videoElement });
-
-	// メタデータが読み込まれたときにも適用
-	videoElement.onloadedmetadata = handler;
 }
 
 function observeAndSetPlaybackRate(rate) {
-	// 既存の video 要素がある場合はすぐに適用
-	const video = document.querySelector("video");
-	if (video) {
-		setPlaybackRate(video, rate);
-	}
+	const bodyObserver = new MutationObserver((mutations) => {
+		const player = document.querySelector("#player .ytp-time-display");
+		if (player) {
+			// #player .ytp-time-display が存在する場合の処理
+			console.log("#player .ytp-time-display が読み込まれました");
+			bodyObserver.disconnect(); // body の監視を停止
 
-	// 動画が後から追加される場合に対応
-	const observer = new MutationObserver((mutations) => {
-		for (const mutation of mutations) {
-			for (const node of mutation.addedNodes) {
-				if (node instanceof HTMLVideoElement) {
-					setPlaybackRate(node, rate);
-					observer.disconnect(); // 1つ見つかったら監視をやめる（必要なら削除）
+			// #player .ytp-time-display を監視する observer を設定
+			const playerObserver = new MutationObserver((mutations) => {
+				for (const mutation of mutations) {
+					if (mutation.attributeName === "class") {
+						if (player.classList.contains("ytp-live")) {
+							// ytp-live クラスが追加された場合の処理
+							setPlaybackRate(1);
+							console.log("ライブ動画");
+						} else {
+							// ytp-live クラスが削除された場合の処理
+							setPlaybackRate(rate);
+							console.log("通常動画");
+						}
+					}
 				}
-			}
+			});
+			playerObserver.observe(player, {
+				attributes: true,
+				attributeFilter: ["class"],
+			});
 		}
 	});
 
-	// `document.body` を監視（video 要素が追加されるのを待つ）
-	observer.observe(document.body, { childList: true, subtree: true });
+	bodyObserver.observe(document.body, { childList: true, subtree: true });
 }
 
-// 1.75倍速で適用
-observeAndSetPlaybackRate(1.75);
+// 設定値で適用
+let playbackRate = 1.75; // デフォルト値
+chrome.storage.sync.get(["playbackRate"], (result) => {
+	if (result.playbackRate) {
+		playbackRate = result.playbackRate;
+	}
+	console.log(`現在の再生スピードは ${playbackRate}`);
+	observeAndSetPlaybackRate(playbackRate);
+});

@@ -9,5 +9,7 @@
 			"matches": ["https://www.youtube.com/*"],
 			"js": ["content.js"]
 		}
-	]
+	],
+	"permissions": ["storage"],
+	"options_page": "options.html"
 }
