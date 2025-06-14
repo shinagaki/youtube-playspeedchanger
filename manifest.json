@@ -1,8 +1,8 @@
 {
 	"name": "YouTube Playback Speed",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"manifest_version": 3,
-	"description": "YouTube の動画読み込み時に再生速度を変更します",
+	"description": "YouTube の動画読み込み時に再生速度を変更します。ライブ配信は1倍速、通常動画は設定倍速で自動再生。",
 	"host_permissions": ["https://www.youtube.com/*"],
 	"content_scripts": [
 		{
