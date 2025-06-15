@@ -140,13 +140,36 @@ class YouTubeSpeedController {
 	}
 
 	setupPlayerObserver() {
-		const playerObserver = new MutationObserver(() => {
-			const wasLive = this.isLive;
-			this.isLive = this.detectLiveStatus();
+		const playerObserver = new MutationObserver((mutations) => {
+			let shouldCheckVideo = false;
 
-			if (wasLive !== this.isLive) {
+			for (const mutation of mutations) {
+				// 新しい動画要素が追加されたかチェック
+				if (mutation.type === "childList") {
+					for (const node of mutation.addedNodes) {
+						if (node.nodeType === Node.ELEMENT_NODE) {
+							if (node.tagName === "VIDEO" || node.querySelector("video")) {
+								shouldCheckVideo = true;
+								break;
+							}
+						}
+					}
+				}
+				// クラス変更（ライブ状態の変化など）もチェック
+				if (mutation.type === "attributes" && mutation.attributeName === "class") {
+					shouldCheckVideo = true;
+				}
+			}
+
+			if (shouldCheckVideo) {
+				const wasLive = this.isLive;
+				this.isLive = this.detectLiveStatus();
 				const targetRate = this.isLive ? 1 : this.currentRate;
-				this.handleVideoLoad(targetRate);
+
+				// ライブ状態が変わった場合、または新しい動画要素が検出された場合
+				if (wasLive !== this.isLive || shouldCheckVideo) {
+					this.handleVideoLoad(targetRate);
+				}
 			}
 		});
 
@@ -158,9 +181,62 @@ class YouTubeSpeedController {
 		});
 		this.observers.add(playerObserver);
 
+		// さらに、動画要素を直接監視するオブザーバーも追加
+		this.setupVideoObserver();
+
 		this.isLive = this.detectLiveStatus();
 		const initialRate = this.isLive ? 1 : this.currentRate;
 		this.handleVideoLoad(initialRate);
+	}
+
+	setupVideoObserver() {
+		// 定期的に動画要素をチェックして、新しい動画が読み込まれた時に倍速を適用
+		const checkVideoElement = () => {
+			const videoElement = document.querySelector("video");
+			if (videoElement && !videoElement.hasAttribute("data-speed-applied")) {
+				// 新しい動画要素を発見
+				videoElement.setAttribute("data-speed-applied", "true");
+
+				const applySpeed = () => {
+					this.isLive = this.detectLiveStatus();
+					const targetRate = this.isLive ? 1 : this.currentRate;
+					this.handleVideoLoad(targetRate);
+				};
+
+				// 動画の準備ができた時点で速度を適用
+				if (videoElement.readyState >= 1) {
+					applySpeed();
+				} else {
+					videoElement.addEventListener("loadedmetadata", applySpeed, { once: true });
+					videoElement.addEventListener("canplay", applySpeed, { once: true });
+				}
+
+				// 動画要素が削除されたら属性をリセット
+				const resetObserver = new MutationObserver((mutations) => {
+					for (const mutation of mutations) {
+						for (const node of mutation.removedNodes) {
+							if (node === videoElement) {
+								resetObserver.disconnect();
+								break;
+							}
+						}
+					}
+				});
+				resetObserver.observe(document.body, { childList: true, subtree: true });
+				this.observers.add(resetObserver);
+			}
+		};
+
+		// 初回チェック
+		checkVideoElement();
+
+		// 定期的にチェック（YouTubeのSPA遷移に対応）
+		const videoCheckInterval = setInterval(checkVideoElement, 1000);
+
+		// クリーンアップ時にインターバルを停止
+		this.observers.add({
+			disconnect: () => clearInterval(videoCheckInterval),
+		});
 	}
 
 	setupStorageListener() {
