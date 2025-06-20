@@ -13,11 +13,13 @@ class YouTubeSpeedController {
 				this.currentRate = rate;
 				this.setupObserver();
 				this.setupStorageListener();
+				this.setupFullscreenListener();
 			})
 			.catch((error) => {
 				console.error("YouTube Speed Extension: Failed to load settings:", error);
 				this.setupObserver();
 				this.setupStorageListener();
+				this.setupFullscreenListener();
 			});
 	}
 
@@ -37,8 +39,17 @@ class YouTubeSpeedController {
 		});
 	}
 
+	findVideoElement() {
+		// 全画面表示と通常表示の両方に対応した動画要素検出
+		return (
+			document.querySelector("video") ||
+			document.fullscreenElement?.querySelector("video") ||
+			document.querySelector("#player video")
+		);
+	}
+
 	setPlaybackRate(rate) {
-		const videoElement = document.querySelector("video");
+		const videoElement = this.findVideoElement();
 		if (videoElement && videoElement.readyState >= 1) {
 			videoElement.playbackRate = rate;
 			return true;
@@ -47,7 +58,7 @@ class YouTubeSpeedController {
 	}
 
 	handleVideoLoad(rate) {
-		const videoElement = document.querySelector("video");
+		const videoElement = this.findVideoElement();
 		if (!videoElement) return;
 
 		const setRate = () => {
@@ -192,7 +203,7 @@ class YouTubeSpeedController {
 	setupVideoObserver() {
 		// 定期的に動画要素をチェックして、新しい動画が読み込まれた時に倍速を適用
 		const checkVideoElement = () => {
-			const videoElement = document.querySelector("video");
+			const videoElement = this.findVideoElement();
 			if (videoElement && !videoElement.hasAttribute("data-speed-applied")) {
 				// 新しい動画要素を発見
 				videoElement.setAttribute("data-speed-applied", "true");
@@ -211,6 +222,36 @@ class YouTubeSpeedController {
 					videoElement.addEventListener("canplay", applySpeed, { once: true });
 				}
 
+				// 動画の変化を監視（src変更、時間リセットなど）
+				const videoChangeObserver = () => {
+					let lastSrc = videoElement.src;
+					let lastCurrentTime = videoElement.currentTime;
+
+					const checkVideoChange = () => {
+						if (
+							videoElement.src !== lastSrc ||
+							(videoElement.currentTime < lastCurrentTime && videoElement.currentTime < 10)
+						) {
+							// 新しい動画に切り替わった
+							videoElement.removeAttribute("data-speed-applied");
+							lastSrc = videoElement.src;
+							lastCurrentTime = videoElement.currentTime;
+
+							// 少し遅延してから速度適用
+							setTimeout(() => checkVideoElement(), 100);
+						}
+						lastCurrentTime = videoElement.currentTime;
+					};
+
+					videoElement.addEventListener("timeupdate", checkVideoChange);
+					videoElement.addEventListener("loadstart", () => {
+						videoElement.removeAttribute("data-speed-applied");
+						setTimeout(() => checkVideoElement(), 100);
+					});
+				};
+
+				videoChangeObserver();
+
 				// 動画要素が削除されたら属性をリセット
 				const resetObserver = new MutationObserver((mutations) => {
 					for (const mutation of mutations) {
@@ -222,7 +263,9 @@ class YouTubeSpeedController {
 						}
 					}
 				});
-				resetObserver.observe(document.body, { childList: true, subtree: true });
+
+				const observeTarget = document.fullscreenElement || document.body;
+				resetObserver.observe(observeTarget, { childList: true, subtree: true });
 				this.observers.add(resetObserver);
 			}
 		};
@@ -252,6 +295,23 @@ class YouTubeSpeedController {
 		if (!this.isLive) {
 			this.setPlaybackRate(this.currentRate);
 		}
+	}
+
+	setupFullscreenListener() {
+		// 全画面状態の変化を監視
+		document.addEventListener("fullscreenchange", () => {
+			// 全画面切り替え時に動画要素の監視を再初期化
+			setTimeout(() => {
+				const videoElement = this.findVideoElement();
+				if (videoElement) {
+					// 全画面切り替え後に速度を再適用
+					videoElement.removeAttribute("data-speed-applied");
+					this.isLive = this.detectLiveStatus();
+					const targetRate = this.isLive ? 1 : this.currentRate;
+					this.handleVideoLoad(targetRate);
+				}
+			}, 100);
+		});
 	}
 
 	cleanup() {

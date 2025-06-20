@@ -22,6 +22,8 @@ This is a Chrome extension (Manifest V3) that automatically sets YouTube video p
 - Promise-based Chrome storage API wrappers with comprehensive error handling
 - Real-time settings synchronization between options page and content script
 - Sophisticated live stream detection using multiple reliable indicators
+- Enhanced fullscreen support with dynamic video element detection
+- Robust video transition handling for playlist/queue playback
 
 ### Live Stream Detection
 
@@ -38,6 +40,13 @@ Live streams are automatically set to 1x speed while recorded videos use the con
 - `chrome.storage.onChanged` listener in content script
 - Immediate application of new settings to currently playing videos
 - No page reload required for settings changes
+
+### Fullscreen & Playlist Support
+
+- **Dynamic video detection**: `findVideoElement()` method supports both normal and fullscreen modes
+- **Fullscreen state monitoring**: Automatic speed reapplication when entering/exiting fullscreen
+- **Video transition detection**: Robust handling of playlist/queue playback with `src` change monitoring
+- **Event-based tracking**: Uses `timeupdate`, `loadstart`, and `loadedmetadata` events for reliable detection
 
 ## Development Commands
 
@@ -82,6 +91,8 @@ npm run ci          # CI mode (no fixes applied)
 3. **Settings changes**: Should apply immediately to current video
 4. **Page navigation**: Should maintain functionality across YouTube navigation
 5. **Memory management**: No leaks during extended usage
+6. **Fullscreen playlist**: Should maintain speed settings when switching videos in fullscreen mode
+7. **Fullscreen transitions**: Should reapply speed when entering/exiting fullscreen
 
 ### Debugging
 
