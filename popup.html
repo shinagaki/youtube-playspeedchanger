@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Playback Speed</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: white;
+        margin: 0;
+        padding: 16px;
+        width: 280px;
+        box-sizing: border-box;
+      }
+      
+      .header {
+        text-align: center;
+        margin-bottom: 16px;
+      }
+      
+      .header h1 {
+        color: #1a1a1a;
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0 0 4px 0;
+      }
+      
+      .header p {
+        color: #666;
+        font-size: 12px;
+        margin: 0;
+      }
+      
+      .form-group {
+        margin-bottom: 16px;
+      }
+      
+      .form-group label {
+        display: block;
+        font-weight: 500;
+        color: #333;
+        margin-bottom: 8px;
+        font-size: 13px;
+      }
+      
+      .form-group select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 2px solid #e1e5e9;
+        border-radius: 6px;
+        font-size: 14px;
+        background: white;
+        transition: border-color 0.2s ease;
+        box-sizing: border-box;
+      }
+      
+      .form-group select:focus {
+        outline: none;
+        border-color: #ff0000;
+        box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.1);
+      }
+      
+      .speed-info {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        padding: 8px;
+        margin-bottom: 16px;
+        font-size: 11px;
+        color: #495057;
+        text-align: center;
+      }
+      
+      .speed-info .icon {
+        margin-right: 4px;
+      }
+      
+      #status {
+        margin-top: 12px;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        text-align: center;
+        font-weight: 500;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>🎬 YouTube再生速度</h1>
+      <p>動画の再生速度を設定</p>
+    </div>
+    
+    <div class="form-group">
+      <label for="playbackRate">再生速度を選択</label>
+      <select id="playbackRate">
+        <option value="0.25">0.25倍速</option>
+        <option value="0.5">0.5倍速</option>
+        <option value="0.75">0.75倍速</option>
+        <option value="1.0">1.0倍速</option>
+        <option value="1.25">1.25倍速</option>
+        <option value="1.5">1.5倍速</option>
+        <option value="1.75" selected>1.75倍速</option>
+        <option value="2.0">2.0倍速</option>
+      </select>
+    </div>
+    
+    <div class="speed-info">
+      <span class="icon">💡</span>
+      ライブ配信は自動的に1倍速で再生
+    </div>
+    
+    <script src="popup.js"></script>
+  </body>
+</html>

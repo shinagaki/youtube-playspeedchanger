@@ -11,9 +11,11 @@ This is a Chrome extension (Manifest V3) that automatically sets YouTube video p
 ### Core Components
 
 - **content.js**: Main logic using `YouTubeSpeedController` class with sophisticated live detection and real-time settings sync
-- **options.js**: Settings page using `OptionsManager` class with modern UI and user feedback
-- **options.html**: Responsive settings UI with Japanese localization and status feedback
-- **manifest.json**: Extension configuration with YouTube host permissions and storage access
+- **popup.js**: Popup UI manager using `PopupManager` class for quick settings access
+- **popup.html**: Compact popup UI (280px width) with Japanese localization for toolbar icon
+- **options.js**: Detailed settings page using `OptionsManager` class with modern UI and user feedback
+- **options.html**: Full-featured settings UI with comprehensive options and status feedback
+- **manifest.json**: Extension configuration with YouTube host permissions, storage access, and popup action
 
 ### Key Design Patterns
 
@@ -69,7 +71,7 @@ npm run ci          # CI mode (no fixes applied)
 
 ### Development Workflow
 
-1. **Code changes**: Make modifications to content.js, options.js, or options.html
+1. **Code changes**: Make modifications to content.js, popup.js/popup.html, or options.js/options.html
 2. **Quality check**: Run `npm run check` to format and lint
 3. **Load extension**: 
    - Open `chrome://extensions/`
@@ -80,6 +82,8 @@ npm run ci          # CI mode (no fixes applied)
 ### Code Quality
 
 - **Biome**: Used for formatting and linting with strict rules
+- **Complexity management**: Refactored setupPlayerObserver and setupVideoObserver methods to reduce cognitive complexity
+- **Method decomposition**: Large methods split into smaller, single-responsibility functions
 - **Error handling**: Comprehensive error handling throughout
 - **Memory management**: Proper observer cleanup and event listener management
 - **Performance**: Optimized DOM queries and minimal console output
@@ -93,10 +97,22 @@ npm run ci          # CI mode (no fixes applied)
 5. **Memory management**: No leaks during extended usage
 6. **Fullscreen playlist**: Should maintain speed settings when switching videos in fullscreen mode
 7. **Fullscreen transitions**: Should reapply speed when entering/exiting fullscreen
+8. **Popup functionality**: Click toolbar icon to open quick settings popup
+9. **Settings sync**: Changes in popup should sync with options page and vice versa
 
 ### Debugging
 
 Set `console.log` temporarily in `detectLiveStatus()` for troubleshooting live detection issues. The extension runs silently in production mode to avoid console pollution.
+
+### Key Methods
+
+- **YouTubeSpeedController.findVideoElement()**: Dynamic video element detection for normal/fullscreen modes
+- **YouTubeSpeedController.detectLiveStatus()**: Multi-layered live stream detection with fallback logic
+- **YouTubeSpeedController.handleVideoLoad()**: Robust playback rate application with retry logic
+- **YouTubeSpeedController.handlePlayerMutations()**: Refactored mutation handling with reduced complexity
+- **YouTubeSpeedController.processNewVideoElement()**: Streamlined new video element processing
+- **OptionsManager.setupStorageListener()**: Real-time settings sync implementation
+- **PopupManager.setupEventListeners()**: Simple auto-save on dropdown change (no buttons)
 
 ### Chrome Storage
 
@@ -123,3 +139,23 @@ See `TEST_CASES.md` for comprehensive test scenarios including:
 - Enable "Developer mode" before loading
 - Use "Reload" button after code changes
 - Check console for any JavaScript errors during development
+
+### UI Architecture
+
+- **Dual UI approach**: Popup for quick access, options page for detailed settings
+- **Popup dimensions**: 280px width for compact toolbar integration
+- **Minimalist popup**: Only dropdown selector and info text, no buttons or links
+- **Auto-save behavior**: Popup automatically saves settings on dropdown change
+- **Cross-component sync**: Both popup and options page share the same storage and sync in real-time
+- **Settings access**: Options page accessible via chrome://extensions/ for detailed configuration
+
+### Important Implementation Notes
+
+- **Video element detection**: Uses progressive fallback strategy for fullscreen compatibility
+- **Speed application timing**: Implements delayed retry (500ms) to handle YouTube's internal resets
+- **Live detection accuracy**: Combines DOM inspection, URL analysis, and time format parsing
+- **Memory management**: All observers and listeners are properly cleaned up in Set-based tracking
+- **Error resilience**: Comprehensive try-catch with graceful degradation for all Chrome API calls
+- **Popup lifecycle**: Popup windows are ephemeral and must handle rapid open/close cycles
+- **Code maintainability**: Recent refactoring reduced method complexity from 34 to <15 for better maintainability
+- **Single responsibility**: Each method now handles a specific aspect of video monitoring or UI management
