@@ -1,6 +1,7 @@
 class PopupManager {
 	constructor() {
 		this.playbackRateInput = null;
+		this.forceNormalSpeedOnLiveInput = null;
 		this.statusElement = null;
 		this.init();
 	}
@@ -15,8 +16,9 @@ class PopupManager {
 
 	setupElements() {
 		this.playbackRateInput = document.getElementById("playbackRate");
+		this.forceNormalSpeedOnLiveInput = document.getElementById("forceNormalSpeedOnLive");
 
-		if (!this.playbackRateInput) {
+		if (!this.playbackRateInput || !this.forceNormalSpeedOnLiveInput) {
 			return;
 		}
 
@@ -49,11 +51,13 @@ class PopupManager {
 
 	async loadSettings() {
 		try {
-			const result = await this.getStorageData(["playbackRate"]);
+			const result = await this.getStorageData(["playbackRate", "forceNormalSpeedOnLive"]);
 			const playbackRate = result.playbackRate || 1.75;
+			const forceNormalSpeedOnLive = result.forceNormalSpeedOnLive !== false; // デフォルトはtrue
 
 			this.playbackRateInput.value = playbackRate;
 			this.selectOptionByValue(playbackRate);
+			this.forceNormalSpeedOnLiveInput.checked = forceNormalSpeedOnLive;
 		} catch (error) {
 			this.showStatus("設定の読み込みに失敗", true);
 		}
@@ -110,6 +114,19 @@ class PopupManager {
 					await this.setStorageData({ playbackRate });
 					this.showStatus(`✅ ${playbackRate}倍速に設定しました`);
 				}
+			} catch (error) {
+				this.showStatus("❌ 保存に失敗しました", true);
+			}
+		});
+
+		// チェックボックスの変更で自動保存
+		this.forceNormalSpeedOnLiveInput.addEventListener("change", async () => {
+			try {
+				const forceNormalSpeedOnLive = this.forceNormalSpeedOnLiveInput.checked;
+				await this.setStorageData({ forceNormalSpeedOnLive });
+				this.showStatus(
+					forceNormalSpeedOnLive ? "✅ ライブ配信は1倍速で再生" : "✅ ライブ配信も指定速度で再生"
+				);
 			} catch (error) {
 				this.showStatus("❌ 保存に失敗しました", true);
 			}

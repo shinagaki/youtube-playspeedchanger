@@ -1,6 +1,7 @@
 class OptionsManager {
 	constructor() {
 		this.playbackRateInput = null;
+		this.forceNormalSpeedOnLiveInput = null;
 		this.saveButton = null;
 		this.statusElement = null;
 		this.init();
@@ -16,16 +17,18 @@ class OptionsManager {
 
 	setupElements() {
 		this.playbackRateInput = document.getElementById("playbackRate");
+		this.forceNormalSpeedOnLiveInput = document.getElementById("forceNormalSpeedOnLive");
 		this.saveButton = document.getElementById("save");
 		this.resetButton = document.getElementById("reset");
 
-		if (!this.playbackRateInput || !this.saveButton) {
+		if (!this.playbackRateInput || !this.forceNormalSpeedOnLiveInput || !this.saveButton) {
 			return;
 		}
 
 		this.createStatusElement();
 		this.loadSettings();
 		this.setupEventListeners();
+		this.setupStorageListener();
 	}
 
 	createStatusElement() {
@@ -52,11 +55,13 @@ class OptionsManager {
 
 	async loadSettings() {
 		try {
-			const result = await this.getStorageData(["playbackRate"]);
+			const result = await this.getStorageData(["playbackRate", "forceNormalSpeedOnLive"]);
 			const playbackRate = result.playbackRate || 1.75;
+			const forceNormalSpeedOnLive = result.forceNormalSpeedOnLive !== false; // デフォルトはtrue
 
 			this.playbackRateInput.value = playbackRate;
 			this.selectOptionByValue(playbackRate);
+			this.forceNormalSpeedOnLiveInput.checked = forceNormalSpeedOnLive;
 		} catch (error) {
 			this.showStatus("設定の読み込みに失敗しました", true);
 		}
@@ -109,13 +114,16 @@ class OptionsManager {
 			try {
 				this.saveButton.disabled = true;
 				const playbackRate = Number.parseFloat(this.playbackRateInput.value);
+				const forceNormalSpeedOnLive = this.forceNormalSpeedOnLiveInput.checked;
 
 				if (Number.isNaN(playbackRate) || playbackRate <= 0) {
 					throw new Error("無効な再生倍速です");
 				}
 
-				await this.setStorageData({ playbackRate });
-				this.showStatus(`✅ 再生倍速を ${playbackRate}倍に設定しました`);
+				await this.setStorageData({ playbackRate, forceNormalSpeedOnLive });
+				this.showStatus(
+					`✅ 設定を保存しました：${playbackRate}倍速, ライブ${forceNormalSpeedOnLive ? "1倍速" : "指定速度"}`
+				);
 			} catch (error) {
 				this.showStatus(`❌ 保存に失敗しました: ${error.message}`, true);
 			} finally {
@@ -129,8 +137,9 @@ class OptionsManager {
 					this.resetButton.disabled = true;
 					this.playbackRateInput.value = 1.75;
 					this.selectOptionByValue(1.75);
-					await this.setStorageData({ playbackRate: 1.75 });
-					this.showStatus("🔄 設定をデフォルト値（1.75倍）にリセットしました");
+					this.forceNormalSpeedOnLiveInput.checked = true;
+					await this.setStorageData({ playbackRate: 1.75, forceNormalSpeedOnLive: true });
+					this.showStatus("🔄 設定をデフォルト値にリセットしました");
 				} catch (error) {
 					this.showStatus(`❌ リセットに失敗しました: ${error.message}`, true);
 				} finally {
@@ -138,6 +147,23 @@ class OptionsManager {
 				}
 			});
 		}
+	}
+
+	setupStorageListener() {
+		chrome.storage.onChanged.addListener((changes, namespace) => {
+			if (namespace === "sync") {
+				if (changes.playbackRate && changes.playbackRate.newValue !== undefined) {
+					this.playbackRateInput.value = changes.playbackRate.newValue;
+					this.selectOptionByValue(changes.playbackRate.newValue);
+				}
+				if (
+					changes.forceNormalSpeedOnLive &&
+					changes.forceNormalSpeedOnLive.newValue !== undefined
+				) {
+					this.forceNormalSpeedOnLiveInput.checked = changes.forceNormalSpeedOnLive.newValue;
+				}
+			}
+		});
 	}
 }
 

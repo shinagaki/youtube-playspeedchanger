@@ -2,6 +2,7 @@ class YouTubeSpeedController {
 	constructor() {
 		this.observers = new Set();
 		this.currentRate = 1.75;
+		this.forceNormalSpeedOnLive = true;
 		this.isLive = false;
 		this.playerElement = null;
 		this.init();
@@ -26,11 +27,12 @@ class YouTubeSpeedController {
 	loadSettings() {
 		return new Promise((resolve, reject) => {
 			try {
-				chrome.storage.sync.get(["playbackRate"], (result) => {
+				chrome.storage.sync.get(["playbackRate", "forceNormalSpeedOnLive"], (result) => {
 					if (chrome.runtime.lastError) {
 						reject(chrome.runtime.lastError);
 						return;
 					}
+					this.forceNormalSpeedOnLive = result.forceNormalSpeedOnLive !== false;
 					resolve(result.playbackRate || 1.75);
 				});
 			} catch (error) {
@@ -207,7 +209,7 @@ class YouTubeSpeedController {
 	handleVideoStatusChange() {
 		const wasLive = this.isLive;
 		this.isLive = this.detectLiveStatus();
-		const targetRate = this.isLive ? 1 : this.currentRate;
+		const targetRate = this.isLive && this.forceNormalSpeedOnLive ? 1 : this.currentRate;
 
 		// ライブ状態が変わった場合、または新しい動画要素が検出された場合
 		if (wasLive !== this.isLive) {
@@ -243,7 +245,7 @@ class YouTubeSpeedController {
 
 		const applySpeed = () => {
 			this.isLive = this.detectLiveStatus();
-			const targetRate = this.isLive ? 1 : this.currentRate;
+			const targetRate = this.isLive && this.forceNormalSpeedOnLive ? 1 : this.currentRate;
 			this.handleVideoLoad(targetRate);
 		};
 
@@ -311,17 +313,24 @@ class YouTubeSpeedController {
 
 	setupStorageListener() {
 		chrome.storage.onChanged.addListener((changes, areaName) => {
-			if (areaName === "sync" && changes.playbackRate) {
-				this.currentRate = changes.playbackRate.newValue || 1.75;
-				this.applyCurrentRate();
+			if (areaName === "sync") {
+				if (changes.playbackRate) {
+					this.currentRate = changes.playbackRate.newValue || 1.75;
+				}
+				if (changes.forceNormalSpeedOnLive) {
+					this.forceNormalSpeedOnLive = changes.forceNormalSpeedOnLive.newValue !== false;
+				}
+				if (changes.playbackRate || changes.forceNormalSpeedOnLive) {
+					this.applyCurrentRate();
+				}
 			}
 		});
 	}
 
 	applyCurrentRate() {
-		if (!this.isLive) {
-			this.setPlaybackRate(this.currentRate);
-		}
+		this.isLive = this.detectLiveStatus();
+		const targetRate = (this.isLive && this.forceNormalSpeedOnLive) ? 1 : this.currentRate;
+		this.setPlaybackRate(targetRate);
 	}
 
 	setupFullscreenListener() {
@@ -334,7 +343,7 @@ class YouTubeSpeedController {
 					// 全画面切り替え後に速度を再適用
 					videoElement.removeAttribute("data-speed-applied");
 					this.isLive = this.detectLiveStatus();
-					const targetRate = this.isLive ? 1 : this.currentRate;
+					const targetRate = this.isLive && this.forceNormalSpeedOnLive ? 1 : this.currentRate;
 					this.handleVideoLoad(targetRate);
 				}
 			}, 100);

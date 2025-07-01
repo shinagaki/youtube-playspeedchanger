@@ -76,6 +76,26 @@
         margin-right: 4px;
       }
       
+      .checkbox-group {
+        margin-bottom: 16px;
+      }
+      
+      .checkbox-group label {
+        display: flex;
+        align-items: center;
+        font-weight: 500;
+        color: #333;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      
+      .checkbox-group input[type="checkbox"] {
+        margin-right: 8px;
+        width: 16px;
+        height: 16px;
+        accent-color: #ff0000;
+      }
+      
       #status {
         margin-top: 12px;
         padding: 8px;
@@ -115,10 +135,13 @@
       </select>
     </div>
     
-    <div class="speed-info">
-      <span class="icon">💡</span>
-      ライブ配信は自動的に1倍速で再生
+    <div class="checkbox-group">
+      <label for="forceNormalSpeedOnLive">
+        <input type="checkbox" id="forceNormalSpeedOnLive" checked>
+        ライブ配信は1倍速で再生
+      </label>
     </div>
+    
     
     <script src="popup.js"></script>
   </body>
