@@ -2,9 +2,10 @@ class YouTubeSpeedController {
 	constructor() {
 		this.observers = new Set();
 		this.currentRate = 1.75;
-		this.forceNormalSpeedOnLive = true;
 		this.isLive = false;
 		this.playerElement = null;
+		this.isNearLiveEdge = false;
+		this.liveEdgeCheckInterval = null;
 		this.init();
 	}
 
@@ -27,12 +28,11 @@ class YouTubeSpeedController {
 	loadSettings() {
 		return new Promise((resolve, reject) => {
 			try {
-				chrome.storage.sync.get(["playbackRate", "forceNormalSpeedOnLive"], (result) => {
+				chrome.storage.sync.get(["playbackRate"], (result) => {
 					if (chrome.runtime.lastError) {
 						reject(chrome.runtime.lastError);
 						return;
 					}
-					this.forceNormalSpeedOnLive = result.forceNormalSpeedOnLive !== false;
 					resolve(result.playbackRate || 1.75);
 				});
 			} catch (error) {
@@ -133,6 +133,65 @@ class YouTubeSpeedController {
 		return isLive;
 	}
 
+	checkLiveEdgeDistance() {
+		const videoElement = this.findVideoElement();
+		if (!videoElement || !this.isLive) {
+			return { nearEdge: false, distance: 0 };
+		}
+
+		try {
+			// バッファの終端位置を取得
+			const buffered = videoElement.buffered;
+			if (buffered.length === 0) {
+				return { nearEdge: false, distance: 0 };
+			}
+
+			const currentTime = videoElement.currentTime;
+			const bufferEnd = buffered.end(buffered.length - 1);
+			const distance = bufferEnd - currentTime;
+
+			// ライブ端との距離が5秒以内なら「近い」と判定
+			const nearEdge = distance <= 5;
+
+			return { nearEdge, distance };
+		} catch (error) {
+			return { nearEdge: false, distance: 0 };
+		}
+	}
+
+	startLiveEdgeMonitoring() {
+		if (this.liveEdgeCheckInterval) {
+			clearInterval(this.liveEdgeCheckInterval);
+		}
+
+		this.liveEdgeCheckInterval = setInterval(() => {
+			if (!this.isLive) {
+				this.stopLiveEdgeMonitoring();
+				return;
+			}
+
+			const { nearEdge, distance } = this.checkLiveEdgeDistance();
+
+			if (nearEdge && !this.isNearLiveEdge) {
+				// ライブ端に近づいた - 1倍速に戻す
+				this.isNearLiveEdge = true;
+				this.setPlaybackRate(1);
+			} else if (!nearEdge && this.isNearLiveEdge && distance > 10) {
+				// ライブ端から離れた（10秒以上の差） - 設定速度に戻す
+				this.isNearLiveEdge = false;
+				this.setPlaybackRate(this.currentRate);
+			}
+		}, 1000);
+	}
+
+	stopLiveEdgeMonitoring() {
+		if (this.liveEdgeCheckInterval) {
+			clearInterval(this.liveEdgeCheckInterval);
+			this.liveEdgeCheckInterval = null;
+		}
+		this.isNearLiveEdge = false;
+	}
+
 	setupObserver() {
 		this.cleanup();
 
@@ -169,7 +228,7 @@ class YouTubeSpeedController {
 		this.setupVideoObserver();
 
 		this.isLive = this.detectLiveStatus();
-		const initialRate = this.isLive ? 1 : this.currentRate;
+		const initialRate = this.currentRate;
 		this.handleVideoLoad(initialRate);
 	}
 
@@ -209,11 +268,18 @@ class YouTubeSpeedController {
 	handleVideoStatusChange() {
 		const wasLive = this.isLive;
 		this.isLive = this.detectLiveStatus();
-		const targetRate = this.isLive && this.forceNormalSpeedOnLive ? 1 : this.currentRate;
+		const targetRate = this.currentRate;
 
 		// ライブ状態が変わった場合、または新しい動画要素が検出された場合
 		if (wasLive !== this.isLive) {
 			this.handleVideoLoad(targetRate);
+
+			// ライブ配信の場合、ライブ端監視を開始
+			if (this.isLive) {
+				this.startLiveEdgeMonitoring();
+			} else {
+				this.stopLiveEdgeMonitoring();
+			}
 		}
 	}
 
@@ -245,8 +311,15 @@ class YouTubeSpeedController {
 
 		const applySpeed = () => {
 			this.isLive = this.detectLiveStatus();
-			const targetRate = this.isLive && this.forceNormalSpeedOnLive ? 1 : this.currentRate;
+			const targetRate = this.currentRate;
 			this.handleVideoLoad(targetRate);
+
+			// ライブ配信の場合、ライブ端監視を開始
+			if (this.isLive) {
+				this.startLiveEdgeMonitoring();
+			} else {
+				this.stopLiveEdgeMonitoring();
+			}
 		};
 
 		// 動画の準備ができた時点で速度を適用
@@ -316,11 +389,6 @@ class YouTubeSpeedController {
 			if (areaName === "sync") {
 				if (changes.playbackRate) {
 					this.currentRate = changes.playbackRate.newValue || 1.75;
-				}
-				if (changes.forceNormalSpeedOnLive) {
-					this.forceNormalSpeedOnLive = changes.forceNormalSpeedOnLive.newValue !== false;
-				}
-				if (changes.playbackRate || changes.forceNormalSpeedOnLive) {
 					this.applyCurrentRate();
 				}
 			}
@@ -329,8 +397,15 @@ class YouTubeSpeedController {
 
 	applyCurrentRate() {
 		this.isLive = this.detectLiveStatus();
-		const targetRate = (this.isLive && this.forceNormalSpeedOnLive) ? 1 : this.currentRate;
+		const targetRate = this.isNearLiveEdge ? 1 : this.currentRate;
 		this.setPlaybackRate(targetRate);
+
+		// ライブ配信の場合、ライブ端監視を開始/停止
+		if (this.isLive) {
+			this.startLiveEdgeMonitoring();
+		} else {
+			this.stopLiveEdgeMonitoring();
+		}
 	}
 
 	setupFullscreenListener() {
@@ -343,7 +418,7 @@ class YouTubeSpeedController {
 					// 全画面切り替え後に速度を再適用
 					videoElement.removeAttribute("data-speed-applied");
 					this.isLive = this.detectLiveStatus();
-					const targetRate = this.isLive && this.forceNormalSpeedOnLive ? 1 : this.currentRate;
+					const targetRate = this.currentRate;
 					this.handleVideoLoad(targetRate);
 				}
 			}, 100);
@@ -356,6 +431,7 @@ class YouTubeSpeedController {
 		}
 		this.observers.clear();
 		this.playerElement = null;
+		this.stopLiveEdgeMonitoring();
 	}
 }
 
