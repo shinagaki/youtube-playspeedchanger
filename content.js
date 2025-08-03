@@ -180,6 +180,12 @@ class YouTubeSpeedController {
 				// ライブ端から離れた（10秒以上の差） - 設定速度に戻す
 				this.isNearLiveEdge = false;
 				this.setPlaybackRate(this.currentRate);
+			} else if (!nearEdge && !this.isNearLiveEdge && distance > 10) {
+				// タイムシフト中で、まだ倍速になっていない場合は倍速にする
+				const videoElement = this.findVideoElement();
+				if (videoElement && Math.abs(videoElement.playbackRate - 1) < 0.1) {
+					this.setPlaybackRate(this.currentRate);
+				}
 			}
 		}, 1000);
 	}
@@ -190,6 +196,25 @@ class YouTubeSpeedController {
 			this.liveEdgeCheckInterval = null;
 		}
 		this.isNearLiveEdge = false;
+	}
+
+	performDelayedSpeedAdjustment() {
+		this.isLive = this.detectLiveStatus();
+
+		if (this.isLive) {
+			this.startLiveEdgeMonitoring();
+			this.checkAndApplyTimeshiftSpeed();
+		} else {
+			this.setPlaybackRate(this.currentRate);
+		}
+	}
+
+	checkAndApplyTimeshiftSpeed() {
+		const { nearEdge, distance } = this.checkLiveEdgeDistance();
+
+		if (!nearEdge && distance > 10) {
+			this.setPlaybackRate(this.currentRate);
+		}
 	}
 
 	setupObserver() {
@@ -227,9 +252,9 @@ class YouTubeSpeedController {
 		// さらに、動画要素を直接監視するオブザーバーも追加
 		this.setupVideoObserver();
 
-		this.isLive = this.detectLiveStatus();
-		const initialRate = this.currentRate;
-		this.handleVideoLoad(initialRate);
+		// 安全のため初期は1倍速で開始し、2秒後に適切な速度に調整
+		this.handleVideoLoad(1);
+		setTimeout(() => this.performDelayedSpeedAdjustment(), 2000);
 	}
 
 	handlePlayerMutations(mutations) {
@@ -310,16 +335,8 @@ class YouTubeSpeedController {
 		videoElement.setAttribute("data-speed-applied", "true");
 
 		const applySpeed = () => {
-			this.isLive = this.detectLiveStatus();
-			const targetRate = this.currentRate;
-			this.handleVideoLoad(targetRate);
-
-			// ライブ配信の場合、ライブ端監視を開始
-			if (this.isLive) {
-				this.startLiveEdgeMonitoring();
-			} else {
-				this.stopLiveEdgeMonitoring();
-			}
+			this.handleVideoLoad(1);
+			setTimeout(() => this.performDelayedSpeedAdjustment(), 2000);
 		};
 
 		// 動画の準備ができた時点で速度を適用
@@ -357,6 +374,17 @@ class YouTubeSpeedController {
 			videoElement.removeAttribute("data-speed-applied");
 			setTimeout(() => this.checkAndProcessVideoElement(), 100);
 		});
+
+		// ライブ配信でのシーク操作を監視
+		if (this.isLive) {
+			videoElement.addEventListener("seeked", () => {
+				setTimeout(() => {
+					if (this.isLive) {
+						this.checkAndApplyTimeshiftSpeed();
+					}
+				}, 500);
+			});
+		}
 	}
 
 	hasVideoChanged(videoElement, lastSrc, lastCurrentTime) {
@@ -415,11 +443,10 @@ class YouTubeSpeedController {
 			setTimeout(() => {
 				const videoElement = this.findVideoElement();
 				if (videoElement) {
-					// 全画面切り替え後に速度を再適用
+					// 全画面切り替え後も安全のため1倍速で開始
 					videoElement.removeAttribute("data-speed-applied");
-					this.isLive = this.detectLiveStatus();
-					const targetRate = this.currentRate;
-					this.handleVideoLoad(targetRate);
+					this.handleVideoLoad(1);
+					setTimeout(() => this.performDelayedSpeedAdjustment(), 1000);
 				}
 			}, 100);
 		});

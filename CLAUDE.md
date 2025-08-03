@@ -36,7 +36,9 @@ The extension uses a multi-layered approach to detect live streams:
 4. **Fallback conditions**: Progress bar presence and duration validation
 
 Live streams use intelligent speed control:
+- **Safe initialization**: Always starts at 1x speed, then adjusts after 2 seconds
 - **Timeshift viewing**: Uses configured speed setting for catching up
+- **Seek detection**: Automatically switches to configured speed when user seeks backward
 - **Live edge detection**: Automatically switches to 1x speed when within 5 seconds of live
 - **Auto resume**: Returns to configured speed when 10+ seconds behind live
 
@@ -93,17 +95,18 @@ npm run ci          # CI mode (no fixes applied)
 
 ### Testing Scenarios
 
-1. **Normal videos**: Should apply custom speed (default 1.75x, range 0.25x-4x)
-2. **Live streams**: Should use configured speed for timeshift, auto-switch to 1x near live edge
-3. **Live edge detection**: Should automatically switch to 1x when within 5 seconds of live
-4. **Timeshift catch-up**: Should use configured speed when 10+ seconds behind live
-5. **Settings changes**: Should apply immediately to current video
-6. **Page navigation**: Should maintain functionality across YouTube navigation
-7. **Memory management**: No leaks during extended usage
-8. **Fullscreen playlist**: Should maintain speed settings when switching videos in fullscreen mode
-9. **Fullscreen transitions**: Should reapply speed when entering/exiting fullscreen
-10. **Popup functionality**: Click toolbar icon to open quick settings popup
-11. **Settings sync**: Changes in popup should sync with options page and vice versa
+1. **Normal videos**: Should start at 1x, then switch to custom speed after 2 seconds
+2. **Live streams**: Should start at 1x and remain at 1x when at live edge
+3. **Live timeshift**: Should switch to configured speed when seeking backward or 10+ seconds behind live
+4. **Live seek detection**: Should automatically apply configured speed when user seeks backward
+5. **Live edge detection**: Should automatically switch to 1x when within 5 seconds of live
+6. **Settings changes**: Should apply immediately to current video
+7. **Page navigation**: Should maintain functionality across YouTube navigation
+8. **Memory management**: No leaks during extended usage
+9. **Fullscreen playlist**: Should maintain speed settings when switching videos in fullscreen mode
+10. **Fullscreen transitions**: Should reapply speed when entering/exiting fullscreen
+11. **Popup functionality**: Click toolbar icon to open quick settings popup
+12. **Settings sync**: Changes in popup should sync with options page and vice versa
 
 ### Debugging
 
@@ -118,6 +121,8 @@ Set `console.log` temporarily in `detectLiveStatus()` for troubleshooting live d
 - **YouTubeSpeedController.processNewVideoElement()**: Streamlined new video element processing
 - **YouTubeSpeedController.checkLiveEdgeDistance()**: Calculates distance to live edge for auto speed control
 - **YouTubeSpeedController.startLiveEdgeMonitoring()**: Monitors live streams for automatic speed switching
+- **YouTubeSpeedController.performDelayedSpeedAdjustment()**: Applies appropriate speed after initial 2-second delay
+- **YouTubeSpeedController.checkAndApplyTimeshiftSpeed()**: Applies configured speed during timeshift viewing
 - **OptionsManager.setupStorageListener()**: Real-time settings sync implementation
 - **PopupManager.setupEventListeners()**: Simple auto-save on dropdown change (no buttons)
 
@@ -159,10 +164,13 @@ See `TEST_CASES.md` for comprehensive test scenarios including:
 
 ### Important Implementation Notes
 
+- **Safe initialization**: All videos start at 1x speed to prevent live stream buffer issues
+- **Delayed speed adjustment**: 2-second delay allows proper live detection before speed changes
 - **Video element detection**: Uses progressive fallback strategy for fullscreen compatibility
 - **Speed application timing**: Implements delayed retry (500ms) to handle YouTube's internal resets
 - **Live detection accuracy**: Combines DOM inspection, URL analysis, and time format parsing
 - **Live edge monitoring**: Monitors buffer distance for automatic speed switching near live edge
+- **Seek event handling**: Detects user seeking in live streams for timeshift speed application
 - **Settings immediacy**: `applyCurrentRate()` method immediately applies setting changes to current video
 - **Memory management**: All observers and listeners are properly cleaned up in Set-based tracking
 - **Error resilience**: Comprehensive try-catch with graceful degradation for all Chrome API calls
@@ -173,7 +181,7 @@ See `TEST_CASES.md` for comprehensive test scenarios including:
 ## Chrome Web Store Publication
 
 ### Current Version
-v1.3.0 with intelligent live stream speed control, automatic live edge detection, popup UI, 4x speed support, custom icons, and immediate settings application.
+v1.4.0 with enhanced live stream intelligence: safe 1x initialization, automatic timeshift detection, seek-based speed switching, live edge monitoring, popup UI, 4x speed support, and immediate settings application.
 
 ### Store Preparation Requirements
 - Screenshots (popup UI, settings page, YouTube operation)
